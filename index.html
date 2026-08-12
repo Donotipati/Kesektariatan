@@ -99,7 +99,7 @@
   .source-slot .sslabel .dot.koordinator{background:var(--accent);}
   .source-slot .sslabel .dot.bawahan{background:var(--purple);}
   .source-slot .ssdesc{font-size:11.5px;color:var(--ink-soft);margin:0 0 10px;line-height:1.5;}
-  .source-slot .ssfile{display:flex;align-items:center;gap:10px;background:var(--paper);border:1px dashed var(--paper-line);border-radius:10px;padding:11px 13px;cursor:pointer;}
+  .source-slot .ssfile, .ssfile{display:flex;align-items:center;gap:10px;background:var(--paper);border:1px dashed var(--paper-line);border-radius:10px;padding:11px 13px;cursor:pointer;}
   .source-slot .ssfile.filled{border-style:solid;border-color:var(--accent-light);}
   .source-slot .ssfile .ssicon{font-size:18px;flex:0 0 auto;}
   .source-slot .ssfile .ssmid{flex:1;min-width:0;}
@@ -391,6 +391,18 @@
       </div>
       <div id="arsipListWrap"></div>
       <div class="empty-note" id="arsipEmptyNote">Belum ada rangkuman yang difinalisasi.</div>
+
+      <div class="section-title">Putusan Diterima</div>
+      <div class="info-card">
+        <p>Putusan &amp; Arahan yang diterima dari kesekretariatan lain (file "Putusan untuk Disebarkan") — jadi rujukan pas nyusun Bahan Musyawarah berikutnya.</p>
+      </div>
+      <div class="ssfile" id="btnImportPutusanDiterima" style="margin-bottom:12px;">
+        <span class="ssicon">📥</span>
+        <div class="ssmid"><div class="ssname">Impor Putusan Diterima</div></div>
+      </div>
+      <input type="file" id="filePutusanDiterima" accept=".json" style="display:none;">
+      <div id="putusanDiterimaListWrap"></div>
+      <div class="empty-note" id="putusanDiterimaEmptyNote">Belum ada putusan yang diterima.</div>
     </div>
 
     <!-- ============ TAB: ATUR ============ -->
@@ -459,7 +471,24 @@
         <button class="btn btn-ghost" id="btnDetailArsipTutup">Tutup</button>
         <button class="btn btn-primary" id="btnDetailArsipExport">Export Ulang (Word)</button>
       </div>
-      <button class="btn btn-danger btn-block" id="btnDetailArsipHapus" style="margin-top:10px;">Hapus Rangkuman Ini</button>
+      <button class="btn btn-gold btn-block" id="btnDetailArsipExportPutusan" style="margin-top:10px;">Ekspor Putusan untuk Disebarkan</button>
+      <p class="field-hint" style="margin-top:-6px;margin-bottom:12px;">Berisi Putusan &amp; Arahan saja (Catatan tetap internal) — buat dibagikan ke instansi yang dikoordinir &amp; kesekretariatan lain.</p>
+      <button class="btn btn-danger btn-block" id="btnDetailArsipHapus">Hapus Rangkuman Ini</button>
+    </div>
+  </div>
+
+  <!-- ============ SHEET: Detail Putusan Diterima ============ -->
+  <div class="sheet-backdrop" id="detailPutusanDiterimaBackdrop">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2 id="detailPutusanDiterimaTitle">Putusan Diterima</h2>
+      <p class="sub" id="detailPutusanDiterimaSub"></p>
+      <div class="musy-box"><div class="mtitle"><span class="dot putusan"></span>Putusan</div><p id="detailPutusanDiterimaIsi" style="font-size:12.5px;color:var(--ink-soft);line-height:1.6;"></p></div>
+      <div class="musy-box"><div class="mtitle"><span class="dot arahan"></span>Arahan</div><p id="detailArahanDiterimaIsi" style="font-size:12.5px;color:var(--ink-soft);line-height:1.6;"></p></div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="btnDetailPutusanDiterimaTutup">Tutup</button>
+        <button class="btn btn-danger" id="btnDetailPutusanDiterimaHapus">Hapus</button>
+      </div>
     </div>
   </div>
 
@@ -536,7 +565,8 @@ var state = {
   draft: null,          // { hijriYear, hijriMonth, koordinator, bawahan, kategori:{...}, musyawarah:{...} }
   stagingKoordinator: null,  // { fileName, periode, instansi:[...] }
   stagingBawahan: null,      // { fileName, shaf, periode, kategori:{...} }
-  arsip: []
+  arsip: [],
+  putusanDiterima: []    // [{ id, shaf, periode, putusan, arahan, createdAt, importedAt }]
 };
 
 function load(){
@@ -546,13 +576,15 @@ function load(){
       var data = JSON.parse(raw);
       state.settings = Object.assign({hijriOffset:0, shaf:""}, data.settings||{});
       state.arsip = data.arsip || [];
+      state.putusanDiterima = data.putusanDiterima || [];
     }
   }catch(e){}
 }
 function save(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
     settings: state.settings,
-    arsip: state.arsip
+    arsip: state.arsip,
+    putusanDiterima: state.putusanDiterima
   }));
 }
 
@@ -584,7 +616,7 @@ function showTab(name){
   document.querySelectorAll(".nav-btn").forEach(function(b){
     b.classList.toggle("active", b.dataset.tab===name);
   });
-  if(name==="arsip") renderArsipList();
+  if(name==="arsip"){ renderArsipList(); renderPutusanDiterimaList(); }
   updatePeriodWidget();
 }
 document.querySelectorAll(".nav-btn").forEach(function(b){
@@ -954,6 +986,46 @@ function exportRangkumanLevelBlob(entry){
   return new Blob([JSON.stringify(pkg, null, 2)], {type:"application/json"});
 }
 
+// Putusan untuk Disebarkan — hanya Putusan & Arahan (Catatan tetap internal).
+// Diekspor manual (tombol terpisah), bukan otomatis tiap Finalisasi.
+function exportPutusanDisebarkanJsonBlob(entry){
+  var pkg = {
+    aplikasi: "kesekretariatan-putusan",
+    shaf: entry.shaf || "",
+    periode: { hijriYear: entry.hijriYear, hijriMonth: entry.hijriMonth, label: hijriMonthLabel(entry.hijriYear, entry.hijriMonth) },
+    putusan: entry.musyawarah.putusan || "",
+    arahan: entry.musyawarah.arahan || "",
+    createdAt: Date.now()
+  };
+  return new Blob([JSON.stringify(pkg, null, 2)], {type:"application/json"});
+}
+function exportPutusanDisebarkanWordBlob(entry){
+  var html = "<h1>Putusan &amp; Arahan Musyawarah</h1>";
+  html += "<p>Periode: "+escapeHtml(hijriMonthLabel(entry.hijriYear, entry.hijriMonth))+"</p>";
+  html += "<p>Dari: "+escapeHtml(entry.shaf||"-")+"</p>";
+  html += "<h2>Putusan Hasil Musyawarah</h2><p>"+(entry.musyawarah.putusan?escapeHtml(entry.musyawarah.putusan).replace(/\n/g,"<br>"):"<em>(tidak ada)</em>")+"</p>";
+  html += "<h2>Arahan atas Hasil Musyawarah</h2><p>"+(entry.musyawarah.arahan?escapeHtml(entry.musyawarah.arahan).replace(/\n/g,"<br>"):"<em>(tidak ada)</em>")+"</p>";
+  var fullHtml =
+    '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'+
+    '<head><meta charset="utf-8"><title>Putusan & Arahan</title>'+
+    '<style>body{font-family:"Times New Roman",Times,serif;font-size:12pt;line-height:1.5;color:#222;} h1{font-size:16pt;} h2{font-size:13.5pt;margin-top:18px;} p{margin:4px 0;text-align:justify;}</style>'+
+    '</head><body>'+html+'</body></html>';
+  return new Blob(['\ufeff', fullHtml], {type:'application/msword'});
+}
+document.getElementById("btnDetailArsipExportPutusan").addEventListener("click", async function(){
+  var entry = state.arsip.find(function(e){ return e.id===currentDetailArsipId; });
+  if(!entry) return;
+  if(!(entry.musyawarah.putusan||"").trim() && !(entry.musyawarah.arahan||"").trim()){
+    toast("Belum ada Putusan/Arahan yang diisi untuk periode ini"); return;
+  }
+  var vh = entry.hijriYear+"-"+String(entry.hijriMonth).padStart(2,"0");
+  var wordBlob = exportPutusanDisebarkanWordBlob(entry);
+  var jsonBlob = exportPutusanDisebarkanJsonBlob(entry);
+  await (window.AgendaFiles ? window.AgendaFiles.saveOrShareBlob("surat-putusan-"+vh+"-H.doc", wordBlob, {offerShare:false}) : Promise.resolve());
+  await (window.AgendaFiles ? window.AgendaFiles.saveOrShareBlob("putusan-disebarkan-"+vh+"-H.json", jsonBlob) : Promise.resolve());
+  toast("Putusan untuk disebarkan berhasil diekspor (Word & JSON)");
+});
+
 document.getElementById("btnFinalisasi").addEventListener("click", async function(){
   if(!state.draft) return;
   var entry = Object.assign({}, state.draft, { id: uid(), createdAt: Date.now(), shaf: (state.settings.shaf||"").trim() });
@@ -1035,6 +1107,75 @@ document.getElementById("btnDetailArsipHapus").addEventListener("click", async f
   detailArsipBackdrop.classList.remove("open");
   renderArsipList();
   toast("Rangkuman dihapus dari arsip");
+});
+
+// ================= Putusan Diterima (dari kesekretariatan lain) =================
+document.getElementById("btnImportPutusanDiterima").addEventListener("click", function(){
+  document.getElementById("filePutusanDiterima").click();
+});
+document.getElementById("filePutusanDiterima").addEventListener("change", async function(e){
+  var f = e.target.files[0]; if(!f) return;
+  e.target.value = "";
+  try{
+    var text = await readFileAsText(f);
+    var data = JSON.parse(text);
+    if(data.aplikasi !== "kesekretariatan-putusan"){
+      toast("File ini bukan Putusan untuk Disebarkan dari Aplikasi 3"); return;
+    }
+    state.putusanDiterima.push({
+      id: uid(), shaf: data.shaf||"", periode: data.periode,
+      putusan: data.putusan||"", arahan: data.arahan||"",
+      createdAt: data.createdAt||Date.now(), importedAt: Date.now()
+    });
+    save();
+    renderPutusanDiterimaList();
+    toast("Putusan berhasil diimpor");
+  }catch(err){
+    toast("Gagal membaca file: "+(err&&err.message?err.message:String(err)));
+  }
+});
+
+function renderPutusanDiterimaList(){
+  var wrap = document.getElementById("putusanDiterimaListWrap");
+  wrap.innerHTML = "";
+  var sorted = state.putusanDiterima.slice().sort(function(a,b){ return b.importedAt-a.importedAt; });
+  document.getElementById("putusanDiterimaEmptyNote").style.display = sorted.length ? "none" : "block";
+  sorted.forEach(function(p){
+    var periodeLabel = p.periode ? hijriMonthLabel(p.periode.hijriYear, p.periode.hijriMonth) : "-";
+    var card = document.createElement("div");
+    card.className = "arsip-card";
+    card.innerHTML =
+      '<div class="atop"><span class="aperiode">'+escapeHtml(p.shaf||"(tanpa nama)")+'</span>'+
+      '<span class="adate">'+new Date(p.importedAt).toLocaleDateString("id-ID",{day:"numeric",month:"short",year:"numeric"})+'</span></div>'+
+      '<div class="ameta">Periode: '+escapeHtml(periodeLabel)+'</div>';
+    card.addEventListener("click", function(){ openDetailPutusanDiterima(p.id); });
+    wrap.appendChild(card);
+  });
+}
+
+var detailPutusanDiterimaBackdrop = document.getElementById("detailPutusanDiterimaBackdrop");
+var currentPutusanDiterimaId = null;
+function openDetailPutusanDiterima(id){
+  var p = state.putusanDiterima.find(function(x){ return x.id===id; });
+  if(!p) return;
+  currentPutusanDiterimaId = id;
+  var periodeLabel = p.periode ? hijriMonthLabel(p.periode.hijriYear, p.periode.hijriMonth) : "-";
+  document.getElementById("detailPutusanDiterimaTitle").textContent = p.shaf || "Putusan Diterima";
+  document.getElementById("detailPutusanDiterimaSub").textContent = "Periode: "+periodeLabel;
+  document.getElementById("detailPutusanDiterimaIsi").innerHTML = p.putusan ? escapeHtml(p.putusan).replace(/\n/g,"<br>") : "<em>(tidak ada)</em>";
+  document.getElementById("detailArahanDiterimaIsi").innerHTML = p.arahan ? escapeHtml(p.arahan).replace(/\n/g,"<br>") : "<em>(tidak ada)</em>";
+  detailPutusanDiterimaBackdrop.classList.add("open");
+}
+document.getElementById("btnDetailPutusanDiterimaTutup").addEventListener("click", function(){ detailPutusanDiterimaBackdrop.classList.remove("open"); });
+detailPutusanDiterimaBackdrop.addEventListener("click", function(e){ if(e.target===this) this.classList.remove("open"); });
+document.getElementById("btnDetailPutusanDiterimaHapus").addEventListener("click", async function(){
+  var ok = await showConfirm("Putusan diterima ini akan dihapus permanen. Yakin?", "Hapus");
+  if(!ok) return;
+  state.putusanDiterima = state.putusanDiterima.filter(function(x){ return x.id!==currentPutusanDiterimaId; });
+  save();
+  detailPutusanDiterimaBackdrop.classList.remove("open");
+  renderPutusanDiterimaList();
+  toast("Putusan diterima dihapus");
 });
 
 // ================= Panel info kanan (layar sangat lebar) =================
@@ -1148,6 +1289,7 @@ renderSlotKoordinator();
 renderSlotBawahan();
 renderDraft();
 renderArsipList();
+renderPutusanDiterimaList();
 renderSidebarFooter();
 renderSidePanel();
 
