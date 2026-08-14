@@ -91,6 +91,9 @@
   .period-widget .plabel{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-light);font-family:"Courier New",monospace;margin:0 0 4px;}
   .period-widget .pval{font-size:17px;font-weight:700;color:var(--paper);margin:0;}
   .period-widget .psub{font-size:11px;color:#A9B4BF;margin-top:2px;}
+  .today-date-widget{text-align:center;margin-top:14px;}
+  .today-date-widget .hijri-big{font-size:21px;font-weight:700;color:var(--paper);margin:0;}
+  .today-date-widget .greg-sub{font-size:12px;color:#A9B4BF;margin:2px 0 0;}
 
   /* ---------- Upload slot (2 sumber tetap) ---------- */
   .source-slot{background:#fff;border:1px solid var(--paper-line);border-radius:var(--radius);padding:14px 15px;margin-bottom:12px;}
@@ -299,6 +302,10 @@
         <button class="icon-btn" id="btnImportQuick" title="Impor backup">⬆</button>
         <button class="icon-btn" id="btnAtur" title="Pengaturan">⚙</button>
       </div>
+    </div>
+    <div class="today-date-widget">
+      <p class="hijri-big" id="todayHijriBig">—</p>
+      <p class="greg-sub" id="todayGregSub">—</p>
     </div>
     <div class="period-widget" id="periodWidget" style="display:none;">
       <p class="plabel">Periode Aktif</p>
@@ -1210,9 +1217,18 @@ document.getElementById("setShaf").addEventListener("input", function(){
   save();
   renderSidebarFooter();
 });
+function renderTodayDateWidget(){
+  var now = new Date();
+  var h = dateToHijri(now);
+  var elH = document.getElementById("todayHijriBig");
+  var elG = document.getElementById("todayGregSub");
+  if(elH) elH.textContent = h.day+" "+HIJRI_MONTHS[h.month-1]+" "+h.year+" H";
+  if(elG) elG.textContent = now.getDate()+" "+MONTHS[now.getMonth()]+" "+now.getFullYear()+" M";
+}
 document.getElementById("setHijriOffset").addEventListener("change", function(){
   state.settings.hijriOffset = parseInt(this.value,10)||0;
   save();
+  renderTodayDateWidget();
   toast("Koreksi tanggal Hijriah disimpan");
 });
 
@@ -1297,6 +1313,7 @@ renderDraft();
 renderArsipList();
 renderPutusanDiterimaList();
 renderSidebarFooter();
+renderTodayDateWidget();
 renderSidePanel();
 
 // ================= App Lock (PIN) =================
