@@ -130,7 +130,7 @@
   .kategori-manual-tag{display:inline-block;font-size:9px;padding:2px 8px;border-radius:999px;background:var(--gold-bg);color:var(--gold);font-family:"Courier New",monospace;letter-spacing:.03em;margin-left:6px;}
 
   .compare-cols{display:flex;gap:10px;margin-bottom:12px;}
-  .compare-col{flex:1;min-width:0;background:var(--paper);border-radius:10px;padding:10px 12px;}
+  .compare-col{flex:1;min-width:0;background:#fff;border:1px solid var(--paper-line);border-radius:10px;padding:10px 12px;}
   .compare-col .cclabel{font-family:"Courier New",monospace;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;margin:0 0 7px;display:flex;align-items:center;gap:6px;}
   .compare-col .cclabel .dot{width:7px;height:7px;border-radius:50%;}
   .compare-col.koordinator .cclabel{color:var(--accent);}
@@ -140,7 +140,7 @@
   .compare-item{margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--paper-line);}
   .compare-item:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none;}
   .compare-item .cijudul{font-size:11.5px;font-weight:700;margin:0 0 2px;}
-  .compare-item .citext{font-size:11px;color:var(--ink-soft);line-height:1.5;margin:0;}
+  .compare-item .citext{font-size:11px;color:var(--ink-soft);line-height:1.5;margin:0;white-space:pre-wrap;word-break:break-word;}
   .compare-empty{font-size:11px;color:var(--ink-soft);font-style:italic;}
 
   .field{margin-bottom:13px;}
@@ -365,24 +365,26 @@
       <div id="musyEmpty" class="empty-note">Belum ada bahan musyawarah. Mulai dari tab Upload.</div>
       <div id="musyWrap" style="display:none;">
 
-        <div class="section-title first">Bahan Musyawarah — 7 Kategori</div>
+        <div class="section-title first">Bahan Musyawarah</div>
         <div id="kategoriListWrap"></div>
+
+        <div id="hasilBawahanRefWrap"></div>
 
         <div class="section-title">Hasil Musyawarah</div>
         <div class="musy-box">
           <div class="mtitle"><span class="dot putusan"></span>Putusan Hasil Musyawarah</div>
           <p class="mdesc">Yang resmi ditetapkan — instruksi, kebijakan, penetapan, kewajiban, atau ketentuan.</p>
-          <textarea id="musyPutusan" placeholder="Tulis putusan resmi musyawarah..."></textarea>
+          <textarea id="musyPutusan" placeholder="Tulis putusan resmi musyawarah..." style="min-height:180px;"></textarea>
         </div>
         <div class="musy-box">
           <div class="mtitle"><span class="dot arahan"></span>Arahan atas Hasil Musyawarah</div>
           <p class="mdesc">Arah, penekanan, himbauan, atau pesan pelaksanaan.</p>
-          <textarea id="musyArahan" placeholder="Tulis arahan pelaksanaan..."></textarea>
+          <textarea id="musyArahan" placeholder="Tulis arahan pelaksanaan..." style="min-height:180px;"></textarea>
         </div>
         <div class="musy-box">
-          <div class="mtitle"><span class="dot catatan"></span>Catatan Hasil Musyawarah</div>
-          <p class="mdesc">Hal yang muncul tapi bukan putusan/arahan — persoalan belum selesai, hal yang perlu diperhatikan, dsb.</p>
-          <textarea id="musyCatatan" placeholder="Tulis catatan tambahan..."></textarea>
+          <div class="mtitle"><span class="dot catatan"></span>Catatan Tambahan</div>
+          <p class="mdesc">Hal lain di luar putusan/arahan — pertimbangan, alasan, hal yang perlu diperhatikan, dsb.</p>
+          <textarea id="musyCatatan" placeholder="Tulis catatan tambahan..." style="min-height:180px;"></textarea>
         </div>
 
         <button class="btn btn-gold btn-block" id="btnFinalisasi" style="margin-top:6px;">Finalisasi &amp; Susun Rangkuman Hasil Level</button>
@@ -538,13 +540,9 @@ var STORAGE_KEY = "kesekretariatanData_v1";
 // 7 kategori Bahan Musyawarah. auto: diisi otomatis dari file yang diupload (bisa dibandingkan
 // 2 kolom). manual: tidak ada sumber otomatis dari App2, kesekretariatan yang isi sendiri.
 var KATEGORI = [
-  {key:"kondisiUmum", label:"Kondisi Umum", dot:"gold", auto:false},
+  {key:"kondisiUmum", label:"Kondisi Umum", dot:"gold", auto:true},
   {key:"capaian", label:"Capaian", dot:"accent", auto:true},
-  {key:"kekurangan", label:"Kekurangan", dot:"warn", auto:true},
-  {key:"kendala", label:"Kendala", dot:"warn", auto:true},
-  {key:"temuan", label:"Temuan", dot:"purple", auto:false},
-  {key:"persoalan", label:"Persoalan", dot:"danger", auto:false},
-  {key:"perluDibahas", label:"Hal yang Perlu Dibahas", dot:"danger", auto:true}
+  {key:"perluDibahas", label:"Hal yang Perlu Diperhatikan", dot:"danger", auto:true}
 ];
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
@@ -666,7 +664,11 @@ document.getElementById("fileKoordinator").addEventListener("change", async func
     var text = await readFileAsText(f);
     var data = JSON.parse(text);
     if(data.aplikasi !== "rangkuman" || !Array.isArray(data.instansi)){
-      warnEl.innerHTML = '<div class="sswarn">⚠ File ini sepertinya bukan paket data dari Aplikasi 2 (Rangkuman). Struktur tidak dikenali.</div>';
+      if(Array.isArray(data.arsipRangkuman) || Array.isArray(data.arsipMusyawarah)){
+        warnEl.innerHTML = '<div class="sswarn">⚠ Ini file <b>Backup lengkap Aplikasi 2</b> (dari tombol ⬇ Unduh Backup), bukan file yang dibutuhin di sini. Yang perlu diupload itu file <b>"paket-data-rangkuman-....json"</b> — muncul otomatis setelah klik <b>Finalisasi Bahan Musyawarah</b> di Aplikasi 2 (tab Rangkuman), biasanya kesimpen bareng file Word hasil laporan.</div>';
+      } else {
+        warnEl.innerHTML = '<div class="sswarn">⚠ File ini sepertinya bukan paket data dari Aplikasi 2 (Rangkuman). Struktur tidak dikenali.</div>';
+      }
       return;
     }
     state.stagingKoordinator = { fileName: f.name, periode: data.periode, instansi: data.instansi, catatanKoordinator: data.catatanKoordinator||"" };
@@ -711,11 +713,15 @@ document.getElementById("fileBawahan").addEventListener("change", async function
   try{
     var text = await readFileAsText(f);
     var data = JSON.parse(text);
-    if(data.aplikasi !== "kesekretariatan" || !data.kategori){
-      warnEl.innerHTML = '<div class="sswarn">⚠ File ini sepertinya bukan Rangkuman Hasil Level dari Aplikasi 3. Struktur tidak dikenali.</div>';
+    if(data.aplikasi !== "kesekretariatan"){
+      if(Array.isArray(data.arsip) || data.settings){
+        warnEl.innerHTML = '<div class="sswarn">⚠ Ini file <b>Backup lengkap Aplikasi 3</b> (dari tombol ⬇ Unduh Backup), bukan file yang dibutuhin di sini. Yang perlu diupload itu file <b>"Rangkuman Hasil Level"</b> — muncul otomatis setelah Finalisasi di Aplikasi 3 milik kesekretariatan level bawahnya.</div>';
+      } else {
+        warnEl.innerHTML = '<div class="sswarn">⚠ File ini sepertinya bukan Rangkuman Hasil Level dari Aplikasi 3. Struktur tidak dikenali.</div>';
+      }
       return;
     }
-    state.stagingBawahan = { fileName: f.name, shaf: data.shaf||"", periode: data.periode, kategori: data.kategori, musyawarah: data.musyawarah||{} };
+    state.stagingBawahan = { fileName: f.name, shaf: data.shaf||"", periode: data.periode, kategori: data.kategori||null, musyawarah: data.musyawarah||{} };
     renderSlotBawahan();
     buildMonthPicker();
   }catch(err){
@@ -817,27 +823,20 @@ document.getElementById("btnSusunBahan").addEventListener("click", function(){
   }
 
   var kategoriState = emptyKategoriState();
-  KATEGORI.forEach(function(k){
-    if(!k.auto) return;
-    var lines = [];
-    if(state.stagingKoordinator){
-      state.stagingKoordinator.instansi.forEach(function(ins){
-        (ins[k.key]||[]).forEach(function(item){
-          lines.push("["+ins.nama+"] "+item.judul+" — "+item.tanggal+": "+item.text);
-        });
+  // Cuma "Hal yang Perlu Diperhatikan" yang masih punya Ringkasan Final manual (Kondisi Umum &
+  // Capaian udah lengkap otomatis, gak perlu pre-fill draft teks).
+  var lines = [];
+  if(state.stagingKoordinator){
+    state.stagingKoordinator.instansi.forEach(function(ins){
+      (ins.perluDibahas||[]).forEach(function(item){
+        lines.push("["+ins.nama+"] "+item.judul+" — "+item.tanggal+": "+item.text);
       });
-    }
-    if(state.stagingBawahan && state.stagingBawahan.kategori[k.key]){
-      lines.push("["+(state.stagingBawahan.shaf||"Kesekretariatan")+"] "+state.stagingBawahan.kategori[k.key]);
-    }
-    kategoriState[k.key] = lines.join("\n");
-  });
-  KATEGORI.forEach(function(k){
-    if(k.auto) return;
-    if(state.stagingBawahan && state.stagingBawahan.kategori[k.key]){
-      kategoriState[k.key] = "["+(state.stagingBawahan.shaf||"Kesekretariatan")+"] "+state.stagingBawahan.kategori[k.key];
-    }
-  });
+    });
+  }
+  if(state.stagingBawahan && state.stagingBawahan.kategori && state.stagingBawahan.kategori.perluDibahas){
+    lines.push("["+(state.stagingBawahan.shaf||"Kesekretariatan")+"] "+state.stagingBawahan.kategori.perluDibahas);
+  }
+  kategoriState.perluDibahas = lines.join("\n");
 
   state.draft = {
     hijriYear: hy, hijriMonth: hm,
@@ -881,11 +880,54 @@ function katFlatItemsFromKoordinator(katKey){
   });
   return out;
 }
+// Kondisi Umum otomatis dari Catatan Koordinator per-instansi App2 (bukan diketik manual lagi).
+function katKondisiUmumFromKoordinator(){
+  if(!state.draft || !state.draft.koordinator) return [];
+  return state.draft.koordinator.instansi
+    .filter(function(ins){ return (ins.catatanKoordinator||"").trim(); })
+    .map(function(ins){ return {judul: ins.nama, text: ins.catatanKoordinator}; });
+}
+function koordinatorItemsForKategori(katKey){
+  if(katKey==="kondisiUmum") return katKondisiUmumFromKoordinator();
+  return katFlatItemsFromKoordinator(katKey);
+}
+// Kolom Kesekretariatan (bawahan) buat Kondisi Umum/Capaian/Hal Perlu Diperhatikan — file
+// Rangkuman Hasil Level yang baru gak lagi bawa bahan mentah (cuma Putusan/Arahan/Catatan), jadi
+// ini biasanya kosong. Dipertahankan buat kompatibilitas kalau ada file format lama yang masih
+// nyimpen "kategori".
 function katItemsFromBawahan(katKey){
-  if(!state.draft || !state.draft.bawahan) return [];
+  if(!state.draft || !state.draft.bawahan || !state.draft.bawahan.kategori) return [];
   var txt = state.draft.bawahan.kategori[katKey];
   if(!txt) return [];
   return [{judul: state.draft.bawahan.shaf || "Kesekretariatan", text: txt}];
+}
+// Kartu Capaian sisi Koordinator: ringkasan angka per instansi + daftar "Keterangan" (gabungan
+// Kekurangan+Kendala lama) buat kegiatan yang sebagian/tidak tercapai atau ada catatan kendala.
+function capaianKoordinatorColHtml(){
+  var html = '<div class="compare-col koordinator"><p class="cclabel"><span class="dot"></span>Koordinator</p>';
+  var instansiList = (state.draft && state.draft.koordinator) ? state.draft.koordinator.instansi : [];
+  if(instansiList.length===0){
+    html += '<div class="compare-empty">Tidak ada data.</div>';
+  } else {
+    instansiList.forEach(function(ins){
+      var total = ins.totalKegiatan||0;
+      var summary = total>0
+        ? (ins.totalTercapai||0)+" tercapai, "+(ins.totalSebagian||0)+" sebagian, "+(ins.totalTidakTercapai||0)+" tidak tercapai (dari "+total+" kegiatan)"
+        : "Belum ada data capaian.";
+      html += '<div class="compare-item"><p class="cijudul">'+escapeHtml(ins.nama)+'</p><p class="citext">'+escapeHtml(summary)+'</p>';
+      var ket = ins.keterangan||[];
+      if(ket.length){
+        html += '<div class="keterangan-list"><p class="ket-label">Keterangan:</p>';
+        ket.forEach(function(item){
+          html += '<p class="ket-item">• '+escapeHtml(item.judul)+' ('+escapeHtml(item.tanggal)+'): '+escapeHtml(item.text)+'</p>';
+        });
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+  }
+  html += '</div>';
+  return html;
 }
 
 function renderDraft(){
@@ -902,15 +944,19 @@ function renderDraft(){
     var manualTag = k.auto ? "" : '<span class="kategori-manual-tag">Manual</span>';
     var compareHtml = "";
     if(k.auto){
+      var koordCol = k.key==="capaian" ? capaianKoordinatorColHtml() : compareColHtml("koordinator","Koordinator", koordinatorItemsForKategori(k.key));
       compareHtml = '<div class="compare-cols">'+
-        compareColHtml("koordinator","Koordinator", katFlatItemsFromKoordinator(k.key))+
+        koordCol+
         compareColHtml("bawahan","Kesekretariatan", katItemsFromBawahan(k.key))+
         '</div>';
-    } else if(state.draft.bawahan && state.draft.bawahan.kategori[k.key]){
+    } else if(state.draft.bawahan && state.draft.bawahan.kategori && state.draft.bawahan.kategori[k.key]){
       compareHtml = '<div class="compare-cols">'+
         compareColHtml("bawahan","Dari Kesekretariatan (periode lalu)", katItemsFromBawahan(k.key))+
         '</div>';
     }
+    var skipRingkasan = (k.key==="kondisiUmum" || k.key==="capaian");
+    var ringkasanHtml = skipRingkasan ? "" :
+      '<div class="field" style="margin-bottom:0;"><label>Ringkasan Final</label><textarea data-katkey="'+k.key+'" placeholder="Tulis ringkasan hasil konsolidasi kategori ini...">'+escapeHtml(state.draft.kategori[k.key])+'</textarea></div>';
     card.innerHTML =
       '<div class="kategori-head'+(idx>1?" collapsed":"")+'" data-idx="'+idx+'">'+
         '<div class="kname"><span class="dot" style="background:var(--'+k.dot+')"></span>'+k.label+manualTag+'</div>'+
@@ -918,7 +964,7 @@ function renderDraft(){
       '</div>'+
       '<div class="kategori-body'+(idx>1?" collapsed":"")+'">'+
         compareHtml+
-        '<div class="field" style="margin-bottom:0;"><label>Ringkasan Final</label><textarea data-katkey="'+k.key+'" placeholder="Tulis ringkasan hasil konsolidasi kategori ini...">'+escapeHtml(state.draft.kategori[k.key])+'</textarea></div>'+
+        ringkasanHtml+
       '</div>';
     wrap.appendChild(card);
   });
@@ -966,7 +1012,7 @@ function composeWordHtml(entry){
   html += "<h2>Hasil Musyawarah</h2>";
   html += "<h3>Putusan Hasil Musyawarah</h3><p>"+(entry.musyawarah.putusan?escapeHtml(entry.musyawarah.putusan).replace(/\n/g,"<br>"):"<em>(tidak ada)</em>")+"</p>";
   html += "<h3>Arahan atas Hasil Musyawarah</h3><p>"+(entry.musyawarah.arahan?escapeHtml(entry.musyawarah.arahan).replace(/\n/g,"<br>"):"<em>(tidak ada)</em>")+"</p>";
-  html += "<h3>Catatan Hasil Musyawarah</h3><p>"+(entry.musyawarah.catatan?escapeHtml(entry.musyawarah.catatan).replace(/\n/g,"<br>"):"<em>(tidak ada)</em>")+"</p>";
+  html += "<h3>Catatan Tambahan</h3><p>"+(entry.musyawarah.catatan?escapeHtml(entry.musyawarah.catatan).replace(/\n/g,"<br>"):"<em>(tidak ada)</em>")+"</p>";
   return html;
 }
 function exportWordBlob(entry){
@@ -981,12 +1027,14 @@ function exportWordBlob(entry){
 
 // File "Rangkuman Hasil Level" — inilah yang jadi input App3 di level atasnya.
 // Ringkas per poin (bukan detail penuh koordinator/bawahan lagi), plus hasil musyawarah.
+// Rangkuman Hasil Level yang naik ke atas — berbasis HASIL MUSYAWARAH yang udah matang
+// (Putusan/Arahan/Catatan Tambahan), BUKAN bahan mentah (Kondisi Umum/Capaian/dst). Bahan mentah
+// tetap ke-arsip lokal di level ini aja buat riwayat, gak ikut naik lagi.
 function exportRangkumanLevelBlob(entry){
   var pkg = {
     aplikasi: "kesekretariatan",
     shaf: entry.shaf || "",
     periode: { hijriYear: entry.hijriYear, hijriMonth: entry.hijriMonth, label: hijriMonthLabel(entry.hijriYear, entry.hijriMonth) },
-    kategori: entry.kategori,
     musyawarah: entry.musyawarah,
     createdAt: entry.createdAt
   };
@@ -1033,8 +1081,39 @@ document.getElementById("btnDetailArsipExportPutusan").addEventListener("click",
   toast("Putusan untuk disebarkan berhasil diekspor (Word & JSON)");
 });
 
+// Kondisi Umum & Capaian gak punya kotak Ringkasan Final manual (isinya udah lengkap dari
+// Catatan Koordinator / angka capaian otomatis) — tapi Word & Rangkuman Hasil Level tetap butuh
+// teks buat kategori ini, jadi digenerate otomatis dari data koordinator+bawahan pas Finalisasi.
+function autoSummaryText(katKey){
+  if(katKey==="capaian") return capaianSummaryTextForExport();
+  var lines = [];
+  koordinatorItemsForKategori(katKey).forEach(function(it){ lines.push(it.judul+": "+it.text); });
+  katItemsFromBawahan(katKey).forEach(function(it){ lines.push("Kesekretariatan ("+it.judul+"): "+it.text); });
+  return lines.join("\n");
+}
+// Teks Capaian versi rata (buat Word/Rangkuman Hasil Level) — sama persis isinya kayak yang
+// ditampilin di layar (capaianKoordinatorColHtml): angka ringkasan + daftar Keterangan per instansi.
+function capaianSummaryTextForExport(){
+  var lines = [];
+  var instansiList = (state.draft && state.draft.koordinator) ? state.draft.koordinator.instansi : [];
+  instansiList.forEach(function(ins){
+    var total = ins.totalKegiatan||0;
+    var summary = total>0
+      ? (ins.totalTercapai||0)+" tercapai, "+(ins.totalSebagian||0)+" sebagian, "+(ins.totalTidakTercapai||0)+" tidak tercapai (dari "+total+" kegiatan)"
+      : "Belum ada data capaian.";
+    lines.push(ins.nama+": "+summary);
+    (ins.keterangan||[]).forEach(function(item){
+      lines.push("  • "+item.judul+" ("+item.tanggal+"): "+item.text);
+    });
+  });
+  katItemsFromBawahan("capaian").forEach(function(it){ lines.push("Kesekretariatan ("+it.judul+"): "+it.text); });
+  return lines.join("\n");
+}
+
 document.getElementById("btnFinalisasi").addEventListener("click", async function(){
   if(!state.draft) return;
+  state.draft.kategori.kondisiUmum = autoSummaryText("kondisiUmum");
+  state.draft.kategori.capaian = autoSummaryText("capaian");
   var entry = Object.assign({}, state.draft, { id: uid(), createdAt: Date.now(), shaf: (state.settings.shaf||"").trim() });
   state.arsip.push(entry);
   save();
